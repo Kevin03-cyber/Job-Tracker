@@ -6,15 +6,11 @@ A job application tracker with a drag-and-drop status board. It has **no login c
 
 | Login | 2FA code step |
 |---|---|
-| <img width="1908" height="977" alt="image" src="https://github.com/user-attachments/assets/8504b0d2-95c9-4ee9-9cff-1bc5a110cfc6" />
- | <img width="1908" height="977" alt="image" src="https://github.com/user-attachments/assets/6b6101a4-d766-453b-9b09-2351f97eca5c" />
- |
+| <img width="1908" height="977" alt="image" src="https://github.com/user-attachments/assets/8504b0d2-95c9-4ee9-9cff-1bc5a110cfc6" />| <img width="1908" height="977" alt="image" src="https://github.com/user-attachments/assets/6b6101a4-d766-453b-9b09-2351f97eca5c" />|
 
 | Board (light) | Board (dark) |
 |---|---|
-| <img width="1913" height="981" alt="image" src="https://github.com/user-attachments/assets/46878de2-8908-4c53-933b-9266d7ffacc0" />
- | <img width="1898" height="972" alt="image" src="https://github.com/user-attachments/assets/7635c34f-b2e4-4f00-b0ba-f2de259f1717" />
- |
+| <img width="1913" height="981" alt="image" src="https://github.com/user-attachments/assets/46878de2-8908-4c53-933b-9266d7ffacc0" />| <img width="1898" height="972" alt="image" src="https://github.com/user-attachments/assets/7635c34f-b2e4-4f00-b0ba-f2de259f1717" />|
 
 ## ✨ Features
 
