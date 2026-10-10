@@ -1,14 +1,54 @@
 import os
+import sqlite3
+import datetime
 import jwt
 from functools import wraps
 from flask import Flask, request, jsonify, g
 
 app = Flask(__name__)
+DB = "tracker.db"
+STATUSES = ["Applied", "Interview", "Offer", "Rejected"]
 
 # must be the SAME value the auth service signs with
 JWT_SECRET = os.environ.get("JWT_SECRET")
 if not JWT_SECRET:
     raise SystemExit("Set JWT_SECRET first (same value as auth-service).")
+
+
+def get_db():
+    conn = sqlite3.connect(DB)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def init_db():
+    conn = get_db()
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS applications (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            company TEXT NOT NULL,
+            role TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'Applied',
+            applied_date TEXT NOT NULL,
+            notes TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_applications_user ON applications(user_id)")
+    conn.commit()
+    conn.close()
+
+
+def row_to_dict(row):
+    return {
+        "id": row["id"],
+        "company": row["company"],
+        "role": row["role"],
+        "status": row["status"],
+        "applied_date": row["applied_date"],
+        "notes": row["notes"],
+    }
 
 
 def token_required(f):
@@ -41,5 +81,66 @@ def me():
     return jsonify(user_id=g.user_id, email=g.email)
 
 
+@app.route("/api/applications", methods=["POST"])
+@token_required
+def create_application():
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        data = {}
+
+    company = str(data.get("company", "")).strip()
+    role = str(data.get("role", "")).strip()
+    status = str(data.get("status", "Applied")).strip()
+    notes = str(data.get("notes", "")).strip()
+    applied_date = str(data.get("applied_date", "")).strip() or datetime.date.today().isoformat()
+
+    if not company or not role:
+        return jsonify(error="Company and role are required."), 400
+    if len(company) > 100 or len(role) > 100:
+        return jsonify(error="Company and role must be 100 characters or fewer."), 400
+    if status not in STATUSES:
+        return jsonify(error="Status must be one of: " + ", ".join(STATUSES)), 400
+    if len(notes) > 1000:
+        return jsonify(error="Notes must be 1000 characters or fewer."), 400
+    try:
+        datetime.date.fromisoformat(applied_date)
+    except ValueError:
+        return jsonify(error="applied_date must look like 2026-10-12."), 400
+
+    # the owner always comes from the verified token, never from the request body
+    conn = get_db()
+    cur = conn.execute(
+        "INSERT INTO applications (user_id, company, role, status, applied_date, notes, created_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (g.user_id, company, role, status, applied_date, notes,
+         datetime.datetime.now(datetime.timezone.utc).isoformat()),
+    )
+    conn.commit()
+    row = conn.execute("SELECT * FROM applications WHERE id = ?", (cur.lastrowid,)).fetchone()
+    conn.close()
+    return jsonify(row_to_dict(row)), 201
+
+
+@app.route("/api/applications")
+@token_required
+def list_applications():
+    status = request.args.get("status")
+    query = "SELECT * FROM applications WHERE user_id = ?"
+    params = [g.user_id]
+
+    if status:
+        if status not in STATUSES:
+            return jsonify(error="Status must be one of: " + ", ".join(STATUSES)), 400
+        query += " AND status = ?"
+        params.append(status)
+
+    query += " ORDER BY applied_date DESC, id DESC"
+    conn = get_db()
+    rows = conn.execute(query, params).fetchall()
+    conn.close()
+    return jsonify([row_to_dict(r) for r in rows])
+
+
 if __name__ == "__main__":
+    init_db()
     app.run(debug=os.environ.get("FLASK_DEBUG") == "1", port=5002)
