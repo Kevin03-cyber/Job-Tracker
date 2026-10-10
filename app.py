@@ -4,7 +4,7 @@ import datetime
 import jwt
 from functools import wraps
 from flask import Flask, request, jsonify, g
-
+from flask import Flask, request, jsonify, g, send_from_directory
 app = Flask(__name__)
 DB = "tracker.db"
 STATUSES = ["Applied", "Interview", "Offer", "Rejected"]
@@ -208,6 +208,9 @@ def delete_application(app_id):
     if cur.rowcount == 0:
         return jsonify(error="Application not found."), 404
     return jsonify(message="Deleted.")
+@app.route("/")
+def index():
+    return send_from_directory("static", "index.html")
 
 
 if __name__ == "__main__":

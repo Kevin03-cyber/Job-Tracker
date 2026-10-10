@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pipeline: job application tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#101828;--bg:#f2f4fb;--mute:#667085;--Applied:#3b5bfd;--Interview:#ff8a00;--Offer:#00b37e;--Rejected:#8a94a8}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Bricolage Grotesque","Segoe UI",system-ui,sans-serif;font-size:16px}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--Applied);outline-offset:2px}
+.hidden{display:none!important}
+.btn{background:var(--ink);color:#fff;border:0;border-radius:8px;padding:11px 18px;font-weight:600;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--ink);border:1.5px solid var(--ink)}
+input,select,textarea{width:100%;padding:11px 12px;border:1.5px solid #c9cfe0;border-radius:8px;background:#fff;margin:6px 0 14px}
+label{font-weight:600;font-size:14px}
+/* auth */
+#auth{min-height:100vh;display:grid;grid-template-columns:1.15fr 1fr}
+.hero{background:var(--ink);color:#fff;padding:56px;display:flex;flex-direction:column;justify-content:space-between}
+.hero h1{font-size:clamp(34px,5vw,60px);line-height:1.02;font-weight:800;margin:0;max-width:11ch}
+.bars{display:grid;gap:10px}
+.bars span{display:block;height:44px;border-radius:6px;padding:11px 14px;font-weight:600;color:#fff}
+.panel{display:flex;align-items:center;justify-content:center;padding:32px}
+.box{width:100%;max-width:340px}
+.box h2{font-size:28px;margin:0 0 20px}
+.msg{min-height:22px;color:#c0234b;font-weight:600;margin:0 0 8px}
+.msg.ok{color:#05764f}
+.link{background:none;border:0;padding:0;margin-top:16px;text-decoration:underline;cursor:pointer;font-weight:600}
+/* app */
+header{display:flex;justify-content:space-between;align-items:center;padding:18px 32px}
+.brand{font-weight:800;font-size:24px}
+.who{display:flex;gap:14px;align-items:center;color:var(--mute)}
+main{padding:0 32px 48px;max-width:1280px;margin:0 auto}
+.summary{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px}
+.summary h2{font-size:44px;margin:0;font-weight:800}
+.summary p{margin:0;color:var(--mute)}
+.strip{display:flex;height:30px;border-radius:8px;overflow:hidden;background:#dfe3f1;margin:14px 0 24px}
+.strip div{color:#fff;font-weight:700;font-size:14px;display:flex;align-items:center;padding-left:10px;min-width:0}
+.toolbar{margin-bottom:18px}
+#addform{background:#fff;border-radius:12px;padding:20px;margin-bottom:24px;display:grid;grid-template-columns:1fr 1fr 180px;gap:0 14px}
+#addform .wide{grid-column:1/-1}
+.board{display:grid;grid-template-columns:repeat(4,1fr);gap:20px}
+.lane{border-top:6px solid var(--c);padding:10px 6px 14px;min-height:280px;border-radius:0 0 10px 10px}
+.lane.over{background:color-mix(in srgb,var(--c) 12%,transparent)}
+.lane h3{display:flex;justify-content:space-between;margin:0 0 12px;font-size:18px}
+.lane h3 b{color:var(--c)}
+.empty{color:var(--mute);font-size:14px;padding:6px 2px}
+.card{background:#fff;border-left:4px solid var(--c);border-radius:8px;padding:12px 14px;margin-bottom:10px;box-shadow:0 1px 2px rgba(16,24,40,.1);cursor:grab}
+.card.drag{opacity:.4}
+.card h4{margin:0;font-size:17px}
+.card .role{margin:2px 0 0;color:var(--mute);font-size:15px}
+.card .notes{margin:8px 0 0;font-size:14px;overflow-wrap:anywhere}
+.foot{display:flex;justify-content:space-between;align-items:center;margin-top:10px;font-size:13px;color:var(--mute)}
+.foot button{border:0;background:#eef0f7;border-radius:6px;width:28px;height:28px;cursor:pointer;margin-left:4px;font-weight:700}
+.foot button:disabled{opacity:.3;cursor:default}
+.foot .del{color:#c0234b}
+@media(max-width:900px){#auth{grid-template-columns:1fr}.hero{padding:32px;gap:28px}.board{grid-template-columns:1fr 1fr}#addform{grid-template-columns:1fr}header,main{padding-left:16px;padding-right:16px}}
+@media(max-width:560px){.board{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<section id="auth">
+  <div class="hero">
+    <h1>Every application, in one pipeline.</h1>
+    <div class="bars" aria-hidden="true">
+      <span style="background:var(--Applied);width:100%">Applied</span>
+      <span style="background:var(--Interview);width:68%">Interview</span>
+      <span style="background:var(--Offer);width:34%">Offer</span>
+    </div>
+  </div>
+  <div class="panel">
+    <form class="box" id="authform">
+      <h2 id="title">Log in</h2>
+      <div class="msg" id="msg" role="alert"></div>
+      <div id="creds">
+        <label for="email">Email</label><input id="email" type="email" autocomplete="username" required>
+        <label for="password">Password</label><input id="password" type="password" autocomplete="current-password" required>
+      </div>
+      <div id="codewrap" class="hidden">
+        <label for="code">6-digit code from your authenticator app</label>
+        <input id="code" inputmode="numeric" maxlength="6" autocomplete="one-time-code">
+      </div>
+      <button class="btn" id="go" type="submit">Log in</button><br>
+      <button class="link" id="toggle" type="button">Create an account</button>
+    </form>
+  </div>
+</section>
+
+<div id="app" class="hidden">
+  <header>
+    <div class="brand">Pipeline</div>
+    <div class="who"><span id="who"></span><button class="btn ghost" id="logout">Log out</button></div>
+  </header>
+  <main>
+    <div class="summary"><h2 id="total">0 applications</h2><p id="rate"></p></div>
+    <div class="strip" id="strip"></div>
+    <div class="toolbar"><button class="btn" id="newbtn">Add application</button></div>
+    <form id="addform" class="hidden">
+      <div><label for="f-company">Company</label><input id="f-company" maxlength="100" required></div>
+      <div><label for="f-role">Role</label><input id="f-role" maxlength="100" required></div>
+      <div><label for="f-status">Stage</label><select id="f-status"></select></div>
+      <div class="wide"><label for="f-notes">Notes</label><textarea id="f-notes" rows="2" maxlength="1000"></textarea></div>
+      <div class="wide"><button class="btn" type="submit">Save application</button></div>
+    </form>
+    <div class="board" id="board"></div>
+  </main>
+</div>
+
+<script>
+const AUTH = "http://127.0.0.1:5001";
+const ST = ["Applied", "Interview", "Offer", "Rejected"];
+let token = null, temp = null, apps = [], mode = "login";
+try { token = sessionStorage.getItem("jt"); } catch (e) {}
+const $ = id => document.getElementById(id);
+const el = (t, c, x) => { const e = document.createElement(t); if (c) e.className = c; if (x != null) e.textContent = x; return e; };
+
+async function call(url, method = "GET", body, authed) {
+  const h = { "Content-Type": "application/json" };
+  if (authed && token) h.Authorization = "Bearer " + token;
+  const r = await fetch(url, { method, headers: h, body: body ? JSON.stringify(body) : undefined });
+  const d = await r.json().catch(() => ({}));
+  if (r.status === 401 && authed) { logout("Your session ended. Log in again."); throw new Error("session"); }
+  if (r.status === 429) throw new Error("Too many attempts. Wait a minute and try again.");
+  if (!r.ok) throw new Error(d.error || "Something went wrong (" + r.status + ").");
+  return d;
+}
+
+/* ---------- login ---------- */
+function setMsg(t, ok) { $("msg").textContent = t || ""; $("msg").className = "msg" + (ok ? " ok" : ""); }
+function setMode(m) {
+  mode = m; const reg = m === "register";
+  $("title").textContent = reg ? "Create account" : "Log in";
+  $("go").textContent = reg ? "Create account" : "Log in";
+  $("toggle").textContent = reg ? "I already have an account" : "Create an account";
+}
+$("toggle").onclick = () => { setMode(mode === "login" ? "register" : "login"); setMsg(""); };
+$("authform").onsubmit = async e => {
+  e.preventDefault(); setMsg("");
+  try {
+    if (temp) {
+      const d = await call(AUTH + "/api/login/2fa", "POST", { temp_token: temp, code: $("code").value.trim() });
+      return enter(d.token);
+    }
+    const email = $("email").value.trim(), password = $("password").value;
+    if (mode === "register") {
+      await call(AUTH + "/api/register", "POST", { email, password });
+      setMode("login"); return setMsg("Account created. Log in to continue.", true);
+    }
+    const d = await call(AUTH + "/api/login", "POST", { email, password });
+    if (d.two_factor_required) {
+      temp = d.temp_token; $("creds").classList.add("hidden"); $("codewrap").classList.remove("hidden");
+      $("code").focus(); $("go").textContent = "Verify code"; setMsg("Enter the code to finish logging in.", true);
+    } else enter(d.token);
+  } catch (err) {
+    setMsg(err.message);
+    if (/temporary/i.test(err.message)) resetAuth();
+  }
+};
+function resetAuth() { temp = null; $("code").value = ""; $("creds").classList.remove("hidden"); $("codewrap").classList.add("hidden"); setMode(mode); }
+
+async function enter(t) {
+  token = t; try { sessionStorage.setItem("jt", t); } catch (e) {}
+  $("auth").classList.add("hidden"); $("app").classList.remove("hidden");
+  try { $("who").textContent = (await call("/api/me", "GET", null, true)).email; await load(); } catch (e) {}
+}
+function logout(m) {
+  token = null; try { sessionStorage.removeItem("jt"); } catch (e) {}
+  resetAuth(); $("password").value = "";
+  $("app").classList.add("hidden"); $("auth").classList.remove("hidden"); setMsg(m || "");
+}
+$("logout").onclick = () => logout();
+
+/* ---------- board ---------- */
+const lanes = {};
+ST.forEach(s => {
+  const lane = el("div", "lane"); lane.style.setProperty("--c", "var(--" + s + ")");
+  const h = el("h3"); h.append(el("span", 0, s), el("b", 0, "0"));
+  const list = el("div"); lane.append(h, list);
+  lane.ondragover = e => { e.preventDefault(); lane.classList.add("over"); };
+  lane.ondragleave = () => lane.classList.remove("over");
+  lane.ondrop = e => {
+    e.preventDefault(); lane.classList.remove("over");
+    const a = apps.find(x => x.id === +e.dataTransfer.getData("text/plain"));
+    if (a && a.status !== s) move(a.id, s);
+  };
+  lanes[s] = { list, count: h.lastChild }; $("board").append(lane);
+  $("f-status").append(new Option(s, s));
+});
+
+async function load() { apps = await call("/api/applications", "GET", null, true); render(); }
+
+function render() {
+  const total = apps.length;
+  ST.forEach(s => {
+    const mine = apps.filter(a => a.status === s);
+    lanes[s].count.textContent = mine.length; lanes[s].list.replaceChildren();
+    if (!mine.length) lanes[s].list.append(el("p", "empty", "Nothing in " + s.toLowerCase() + " yet."));
+    mine.forEach(a => lanes[s].list.append(card(a)));
+  });
+  $("total").textContent = total + (total === 1 ? " application" : " applications");
+  const reached = apps.filter(a => a.status === "Interview" || a.status === "Offer").length;
+  $("rate").textContent = total ? Math.round(reached / total * 100) + "% have reached an interview or offer" : "Add your first application to start the pipeline.";
+  $("strip").replaceChildren();
+  ST.forEach(s => {
+    const n = apps.filter(a => a.status === s).length;
+    if (!n) return;
+    const seg = el("div", 0, n); seg.style.flex = n; seg.style.background = "var(--" + s + ")"; seg.title = s;
+    $("strip").append(seg);
+  });
+}
+
+function card(a) {
+  const c = el("div", "card"); c.draggable = true; c.style.setProperty("--c", "var(--" + a.status + ")");
+  c.ondragstart = e => { e.dataTransfer.setData("text/plain", a.id); c.classList.add("drag"); };
+  c.ondragend = () => c.classList.remove("drag");
+  c.append(el("h4", 0, a.company), el("p", "role", a.role));
+  if (a.notes) c.append(el("p", "notes", a.notes));
+  const f = el("div", "foot"), b = el("div"), i = ST.indexOf(a.status);
+  [["‹", -1, "Move back"], ["›", 1, "Move forward"]].forEach(([t, d, tip]) => {
+    const x = el("button", 0, t); x.title = tip; x.setAttribute("aria-label", tip); x.disabled = !ST[i + d];
+    x.onclick = () => move(a.id, ST[i + d]); b.append(x);
+  });
+  const del = el("button", "del", "✕"); del.title = "Delete"; del.setAttribute("aria-label", "Delete application");
+  del.onclick = () => { if (confirm("Delete " + a.company + "?")) act("/api/applications/" + a.id, "DELETE"); };
+  b.append(del); f.append(el("span", 0, a.applied_date), b); c.append(f);
+  return c;
+}
+
+async function act(url, method, body) {
+  try { await call(url, method, body, true); await load(); }
+  catch (e) { if (e.message !== "session") alert(e.message); }
+}
+const move = (id, status) => act("/api/applications/" + id, "PATCH", { status });
+
+$("newbtn").onclick = () => { $("addform").classList.toggle("hidden"); $("f-company").focus(); };
+$("addform").onsubmit = async e => {
+  e.preventDefault();
+  await act("/api/applications", "POST", {
+    company: $("f-company").value, role: $("f-role").value,
+    status: $("f-status").value, notes: $("f-notes").value
+  });
+  e.target.reset(); e.target.classList.add("hidden");
+};
+
+if (token) enter(token);
+</script>
+</body>
+</html>
