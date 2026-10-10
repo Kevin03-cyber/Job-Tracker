@@ -139,6 +139,75 @@ def list_applications():
     rows = conn.execute(query, params).fetchall()
     conn.close()
     return jsonify([row_to_dict(r) for r in rows])
+@app.route("/api/applications/<int:app_id>", methods=["PATCH"])
+@token_required
+def update_application(app_id):
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or not data:
+        return jsonify(error="Send at least one field to update."), 400
+
+    # only these five fields can ever be changed; anything else (like user_id) is ignored
+    fields = {}
+    if "company" in data:
+        v = str(data["company"]).strip()
+        if not v or len(v) > 100:
+            return jsonify(error="Company must be 1 to 100 characters."), 400
+        fields["company"] = v
+    if "role" in data:
+        v = str(data["role"]).strip()
+        if not v or len(v) > 100:
+            return jsonify(error="Role must be 1 to 100 characters."), 400
+        fields["role"] = v
+    if "status" in data:
+        v = str(data["status"]).strip()
+        if v not in STATUSES:
+            return jsonify(error="Status must be one of: " + ", ".join(STATUSES)), 400
+        fields["status"] = v
+    if "applied_date" in data:
+        v = str(data["applied_date"]).strip()
+        try:
+            datetime.date.fromisoformat(v)
+        except ValueError:
+            return jsonify(error="applied_date must look like 2026-10-12."), 400
+        fields["applied_date"] = v
+    if "notes" in data:
+        v = str(data["notes"]).strip()
+        if len(v) > 1000:
+            return jsonify(error="Notes must be 1000 characters or fewer."), 400
+        fields["notes"] = v
+
+    if not fields:
+        return jsonify(error="No valid fields to update."), 400
+
+    # the column names come from the fixed list above, never from the user's text
+    set_clause = ", ".join(f"{col} = ?" for col in fields)
+    params = list(fields.values()) + [app_id, g.user_id]
+
+    conn = get_db()
+    cur = conn.execute(
+        f"UPDATE applications SET {set_clause} WHERE id = ? AND user_id = ?", params
+    )
+    conn.commit()
+    if cur.rowcount == 0:
+        conn.close()
+        return jsonify(error="Application not found."), 404
+    row = conn.execute("SELECT * FROM applications WHERE id = ?", (app_id,)).fetchone()
+    conn.close()
+    return jsonify(row_to_dict(row))
+
+
+@app.route("/api/applications/<int:app_id>", methods=["DELETE"])
+@token_required
+def delete_application(app_id):
+    conn = get_db()
+    cur = conn.execute(
+        "DELETE FROM applications WHERE id = ? AND user_id = ?", (app_id, g.user_id)
+    )
+    conn.commit()
+    conn.close()
+    if cur.rowcount == 0:
+        return jsonify(error="Application not found."), 404
+    return jsonify(message="Deleted.")
 
 
 if __name__ == "__main__":
